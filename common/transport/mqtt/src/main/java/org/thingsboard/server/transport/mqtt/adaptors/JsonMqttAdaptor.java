@@ -47,7 +47,7 @@ import java.util.UUID;
 /**
  * @author Andrew Shvayka
  */
-//@Component("JsonMqttAdaptor")
+@Component("JsonMqttAdaptor")
 @Slf4j
 public class JsonMqttAdaptor implements MqttTransportAdaptor {
 
@@ -58,6 +58,7 @@ public class JsonMqttAdaptor implements MqttTransportAdaptor {
     @Override
     public TransportProtos.PostTelemetryMsg convertToPostTelemetry(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), false);
+        log.info(payload);
         try {
             return JsonConverter.convertToTelemetryProto(new JsonParser().parse(payload));
         } catch (IllegalStateException | JsonSyntaxException ex) {
@@ -68,6 +69,7 @@ public class JsonMqttAdaptor implements MqttTransportAdaptor {
     @Override
     public TransportProtos.PostAttributeMsg convertToPostAttributes(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), false);
+        log.info(payload);
         try {
             return JsonConverter.convertToAttributesProto(new JsonParser().parse(payload));
         } catch (IllegalStateException | JsonSyntaxException ex) {
@@ -78,6 +80,7 @@ public class JsonMqttAdaptor implements MqttTransportAdaptor {
     @Override
     public TransportProtos.GetAttributeRequestMsg convertToGetAttributes(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String topicName = inbound.variableHeader().topicName();
+        log.info(topicName);
         try {
             TransportProtos.GetAttributeRequestMsg.Builder result = TransportProtos.GetAttributeRequestMsg.newBuilder();
             result.setRequestId(Integer.valueOf(topicName.substring(MqttTopics.DEVICE_ATTRIBUTES_REQUEST_TOPIC_PREFIX.length())));
@@ -101,6 +104,7 @@ public class JsonMqttAdaptor implements MqttTransportAdaptor {
     @Override
     public TransportProtos.ToDeviceRpcResponseMsg convertToDeviceRpcResponse(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String topicName = inbound.variableHeader().topicName();
+        log.info(topicName);
         try {
             Integer requestId = Integer.valueOf(topicName.substring(MqttTopics.DEVICE_RPC_RESPONSE_TOPIC.length()));
             String payload = inbound.payload().toString(UTF8);
@@ -115,6 +119,8 @@ public class JsonMqttAdaptor implements MqttTransportAdaptor {
     public TransportProtos.ToServerRpcRequestMsg convertToServerRpcRequest(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String topicName = inbound.variableHeader().topicName();
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), false);
+        log.info(topicName);
+        log.info(payload);
         try {
             Integer requestId = Integer.valueOf(topicName.substring(MqttTopics.DEVICE_RPC_REQUESTS_TOPIC.length()));
             return JsonConverter.convertToServerRpcRequest(new JsonParser().parse(payload), requestId);
@@ -126,6 +132,7 @@ public class JsonMqttAdaptor implements MqttTransportAdaptor {
     @Override
     public TransportProtos.ClaimDeviceMsg convertToClaimDevice(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), true);
+        log.info(payload);
         try {
             return JsonConverter.convertToClaimDeviceProto(ctx.getDeviceId(), payload);
         } catch (IllegalStateException | JsonSyntaxException ex) {
@@ -204,15 +211,49 @@ public class JsonMqttAdaptor implements MqttTransportAdaptor {
 
     public static JsonElement validateJsonPayload(UUID sessionId, ByteBuf payloadData) throws AdaptorException {
         String payload = validatePayload(sessionId, payloadData, false);
+        log.info(payload);
         try {
             return new JsonParser().parse(payload);
         } catch (JsonSyntaxException ex) {
-            throw new AdaptorException(ex);
+        	//convert to json if it is not json
+        	try {
+        		return convertBleGwMsgToJsonElement(payload);
+        	}
+        	catch (JsonSyntaxException ex1) {
+        		throw new AdaptorException(ex1);
+        	}
         }
+    }
+    
+    public static JsonElement convertBleGwMsgToJsonElement(String s)  throws AdaptorException{
+    	//String s = "-mA09E1A179456 -a06 -uFEEE180D -f006B72082A3D6702000000007A0105 -nPolar OH1 17945624 -f006B2F0073 -r33 -c39";
+    	if (s==null || s.isEmpty() || !s.startsWith("-")) {
+    		throw new AdaptorException(new IllegalArgumentException("The msg is not I wanted!"));
+    	}
+    	JsonObject jo = new JsonObject();
+    	String k,v;
+    	String[] ss = s.trim().replaceFirst("-", "").split(" -");
+    	for (int i=0; i<ss.length; i++) {
+    		if (ss[i].length()>0) {
+    			k=ss[i].substring(0, 1);
+    			v=ss[i].substring(1);
+    			//just concatenate the key times when it is duplicate
+    			while (jo.has(k)){
+    				k=k.concat(k);
+    			}
+    			jo.addProperty(k, v);
+    		}
+    		else {
+    			log.warn("the [{}] element is empty and skipped.",i);
+    		}
+    	}
+    	log.debug(jo.toString());
+    	return jo;
     }
 
     private static String validatePayload(UUID sessionId, ByteBuf payloadData, boolean isEmptyPayloadAllowed) throws AdaptorException {
         String payload = payloadData.toString(UTF8);
+        log.info(payload);
         if (payload == null) {
             log.warn("[{}] Payload is empty!", sessionId);
             if (!isEmptyPayloadAllowed) {
