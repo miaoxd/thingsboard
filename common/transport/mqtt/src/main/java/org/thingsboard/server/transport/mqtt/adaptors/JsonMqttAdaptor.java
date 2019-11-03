@@ -47,7 +47,7 @@ import java.util.UUID;
 /**
  * @author Andrew Shvayka
  */
-@Component("JsonMqttAdaptor")
+//@Component("JsonMqttAdaptor")
 @Slf4j
 public class JsonMqttAdaptor implements MqttTransportAdaptor {
 
