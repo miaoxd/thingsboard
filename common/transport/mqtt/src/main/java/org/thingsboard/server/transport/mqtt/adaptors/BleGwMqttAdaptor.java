@@ -65,7 +65,7 @@ public class BleGwMqttAdaptor implements MqttTransportAdaptor {
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), false);
         try {
             //return JsonConverter.convertToTelemetryProto(new JsonParser().parse(payload));
-        	log.debug(payload);
+        	log.warn(payload);
         	return BleGwStrConverter.convertToTelemetryProto(payload);
         } catch (IllegalStateException | JsonSyntaxException ex) {
             throw new AdaptorException(ex);
@@ -80,7 +80,9 @@ public class BleGwMqttAdaptor implements MqttTransportAdaptor {
     public TransportProtos.PostAttributeMsg convertToPostAttributes(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), false);
         try {
-            return JsonConverter.convertToAttributesProto(new JsonParser().parse(payload));
+            //return JsonConverter.convertToAttributesProto(new JsonParser().parse(payload));
+        	log.warn(payload);
+        	return BleGwStrConverter.convertToAttributesProto(payload);
         } catch (IllegalStateException | JsonSyntaxException ex) {
             throw new AdaptorException(ex);
         }
@@ -91,17 +93,17 @@ public class BleGwMqttAdaptor implements MqttTransportAdaptor {
         String topicName = inbound.variableHeader().topicName();
         try {
             TransportProtos.GetAttributeRequestMsg.Builder result = TransportProtos.GetAttributeRequestMsg.newBuilder();
-            result.setRequestId(Integer.valueOf(topicName.substring(MqttTopics.DEVICE_ATTRIBUTES_REQUEST_TOPIC_PREFIX.length())));
-            String payload = inbound.payload().toString(UTF8);
-            JsonElement requestBody = new JsonParser().parse(payload);
-            Set<String> clientKeys = toStringSet(requestBody, "clientKeys");
-            Set<String> sharedKeys = toStringSet(requestBody, "sharedKeys");
-            if (clientKeys != null) {
-                result.addAllClientAttributeNames(clientKeys);
-            }
-            if (sharedKeys != null) {
-                result.addAllSharedAttributeNames(sharedKeys);
-            }
+//            result.setRequestId(Integer.valueOf(topicName.substring(MqttTopics.DEVICE_ATTRIBUTES_REQUEST_TOPIC_PREFIX.length())));
+//            String payload = inbound.payload().toString(UTF8);
+//            JsonElement requestBody = new JsonParser().parse(payload);
+//            Set<String> clientKeys = toStringSet(requestBody, "clientKeys");
+//            Set<String> sharedKeys = toStringSet(requestBody, "sharedKeys");
+//            if (clientKeys != null) {
+//                result.addAllClientAttributeNames(clientKeys);
+//            }
+//            if (sharedKeys != null) {
+//                result.addAllSharedAttributeNames(sharedKeys);
+//            }
             return result.build();
         } catch (RuntimeException e) {
             log.warn("Failed to decode get attributes request", e);
@@ -127,6 +129,7 @@ public class BleGwMqttAdaptor implements MqttTransportAdaptor {
         String topicName = inbound.variableHeader().topicName();
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), false);
         try {
+        	log.warn(payload);
             Integer requestId = Integer.valueOf(topicName.substring(MqttTopics.DEVICE_RPC_REQUESTS_TOPIC.length()));
             return JsonConverter.convertToServerRpcRequest(new JsonParser().parse(payload), requestId);
         } catch (IllegalStateException | JsonSyntaxException ex) {
@@ -138,6 +141,7 @@ public class BleGwMqttAdaptor implements MqttTransportAdaptor {
     public TransportProtos.ClaimDeviceMsg convertToClaimDevice(MqttDeviceAwareSessionContext ctx, MqttPublishMessage inbound) throws AdaptorException {
         String payload = validatePayload(ctx.getSessionId(), inbound.payload(), true);
         try {
+        	log.warn(payload);
             return JsonConverter.convertToClaimDeviceProto(ctx.getDeviceId(), payload);
         } catch (IllegalStateException | JsonSyntaxException ex) {
             throw new AdaptorException(ex);
@@ -204,23 +208,23 @@ public class BleGwMqttAdaptor implements MqttTransportAdaptor {
         return new MqttPublishMessage(mqttFixedHeader, header, payload);
     }
 
-    private Set<String> toStringSet(JsonElement requestBody, String name) {
-        JsonElement element = requestBody.getAsJsonObject().get(name);
-        if (element != null) {
-            return new HashSet<>(Arrays.asList(element.getAsString().split(",")));
-        } else {
-            return null;
-        }
-    }
+//    private Set<String> toStringSet(JsonElement requestBody, String name) {
+//        JsonElement element = requestBody.getAsJsonObject().get(name);
+//        if (element != null) {
+//            return new HashSet<>(Arrays.asList(element.getAsString().split(",")));
+//        } else {
+//            return null;
+//        }
+//    }
 
-    public static JsonElement validateJsonPayload(UUID sessionId, ByteBuf payloadData) throws AdaptorException {
-        String payload = validatePayload(sessionId, payloadData, false);
-        try {
-            return new JsonParser().parse(payload);
-        } catch (JsonSyntaxException ex) {
-            throw new AdaptorException(ex);
-        }
-    }
+//    public static JsonElement validateJsonPayload(UUID sessionId, ByteBuf payloadData) throws AdaptorException {
+//        String payload = validatePayload(sessionId, payloadData, false);
+//        try {
+//            return new JsonParser().parse(payload);
+//        } catch (JsonSyntaxException ex) {
+//            throw new AdaptorException(ex);
+//        }
+//    }
 
     private static String validatePayload(UUID sessionId, ByteBuf payloadData, boolean isEmptyPayloadAllowed) throws AdaptorException {
         String payload = payloadData.toString(UTF8);
